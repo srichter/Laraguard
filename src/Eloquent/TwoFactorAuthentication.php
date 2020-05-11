@@ -3,6 +3,7 @@
 namespace DarkGhostHunter\Laraguard\Eloquent;
 
 use ParagonIE\ConstantTime\Base32;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Database\Eloquent\Model;
 use DarkGhostHunter\Laraguard\Contracts\TwoFactorTotp;
 
@@ -20,6 +21,7 @@ use DarkGhostHunter\Laraguard\Contracts\TwoFactorTotp;
  * @property int $seconds
  * @property int $window
  * @property string $algorithm
+ * @property bool $encrypted
  * @property array $totp_config
  * @property null|\Illuminate\Support\Collection $recovery_codes
  * @property null|\Illuminate\Support\Collection $safe_devices
@@ -46,6 +48,7 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
         'digits'             => 'int',
         'seconds'            => 'int',
         'window'             => 'int',
+        'encrypted'          => 'bool',
         'recovery_codes'     => 'collection',
         'safe_devices'       => 'collection',
     ];
@@ -78,7 +81,17 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
      */
     protected function getSharedSecretAttribute($value)
     {
-        return $value === null ? $value : Base32::encodeUpper($value);
+        if ($value === null) {
+            return $value;
+        }
+
+        if ($this->encrypted) {
+            $value = Crypt::decryptString($value);
+        }
+
+        $value = Base32::encodeUpper($value);
+
+        return $value;
     }
 
     /**
@@ -88,7 +101,13 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
      */
     protected function setSharedSecretAttribute($value)
     {
-        $this->attributes['shared_secret'] = Base32::decodeUpper($value);
+        $value = Base32::decodeUpper($value);
+
+        if ($this->encrypted) {
+            $value = Crypt::encryptString($value);
+        }
+
+        $this->attributes['shared_secret'] = $value;
     }
 
     /**
@@ -99,6 +118,37 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
     protected function setAlgorithmAttribute($value)
     {
         $this->attributes['algorithm'] = strtolower($value);
+    }
+
+    /**
+     * Gets the Recovery Codes attribute, optionally from its encrypted form.
+     *
+     * @param $value
+     * @return null|\Illuminate\Support\Collection
+     */
+    protected function getRecoveryCodesAttribute($value)
+    {
+        $value = $this->castAttribute('recovery_codes', $value);
+
+        if ($this->encrypted) {
+            $value = static::decryptRecoveryCodes($value);
+        }
+
+        return $value;
+    }
+
+    /**
+     * Sets the Recovery Codes attribute, optionally to its encrypted form.
+     *
+     * @param $value
+     */
+    protected function setRecoveryCodesAttribute($value)
+    {
+        if ($this->encrypted) {
+            $value = static::encryptRecoveryCodes($value);
+        }
+
+        $this->attributes['recovery_codes'] = $value;
     }
 
     /**

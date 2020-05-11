@@ -110,8 +110,10 @@ return [
     |--------------------------------------------------------------------------
     |
     | While this package uses recommended RFC 4226 and RDC 6238 settings, you
-    | can further configure how TOTP should work. These settings are saved
-    | for each 2FA authentication, so it will only affect new accounts.
+    | can further configure how TOTP should work. You can specify whether the
+    | shared secret and recovery codes should be stored in the db encrypted.
+    | These settings are saved for each 2FA authentication, so it will only
+    | affect new accounts.
     |
     */
 
@@ -122,5 +124,6 @@ return [
         'seconds' => 30,
         'window' => 1,
         'algorithm' => 'sha1',
+        'encrypted' => false,
     ],
 ];

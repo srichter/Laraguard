@@ -342,7 +342,7 @@ class ForcesTwoFactorAuthTest extends TestCase
     {
         $code = $this->user->generateRecoveryCodes()->first()['code'];
 
-        $this->user->twoFactorAuth->setAttribute('recovery_codes', null)->save();
+        tap($this->user->twoFactorAuth)->setAttribute('recovery_codes', null)->save();
 
         $this->post('login', [
             'email'    => 'foo@test.com',

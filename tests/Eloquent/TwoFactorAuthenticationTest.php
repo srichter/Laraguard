@@ -9,6 +9,7 @@ use ParagonIE\ConstantTime\Base32;
 use Tests\Stubs\UserTwoFactorStub;
 use Tests\RunsPublishableMigrations;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use DarkGhostHunter\Laraguard\Eloquent\TwoFactorAuthentication;
@@ -52,7 +53,125 @@ class TwoFactorAuthenticationTest extends TestCase
 
         $attributes = $tfa->getAttributes();
 
+        // if (config('laraguard.totp.encrypted')) {
+        //     $attributes['shared_secret'] = Crypt::decryptString($attributes['shared_secret']);
+        // }
+
         $this->assertEquals('10a561cd486c7f866e71eae1e212a8c63afcc73a', bin2hex($attributes['shared_secret']));
+    }
+
+    public function test_encrypts_shared_secret_if_enabled()
+    {
+        $tfa = new TwoFactorAuthentication();
+
+        $tfa->encrypted = true;
+
+        $tfa->shared_secret = 'CCSWDTKINR7YM3TR5LQ6EEVIYY5PZRZ2';
+
+        $attributes = $tfa->getAttributes();
+
+        $this->assertNotEquals('10a561cd486c7f866e71eae1e212a8c63afcc73a', bin2hex($attributes['shared_secret']));
+    }
+
+    public function test_does_not_encrypt_shared_secret_if_disabled()
+    {
+        $tfa = new TwoFactorAuthentication();
+
+        $tfa->encrypted = false;
+
+        $tfa->shared_secret = 'CCSWDTKINR7YM3TR5LQ6EEVIYY5PZRZ2';
+
+        $attributes = $tfa->getAttributes();
+
+        $this->assertEquals('10a561cd486c7f866e71eae1e212a8c63afcc73a', bin2hex($attributes['shared_secret']));
+    }
+
+    public function test_decrypts_shared_secret_if_enabled()
+    {
+        $tfa = new TwoFactorAuthentication();
+
+        $tfa->encrypted = true;
+
+        $attributes = $tfa->getAttributes();
+        $attributes['shared_secret'] = Crypt::encryptString(Base32::decodeUpper('CCSWDTKINR7YM3TR5LQ6EEVIYY5PZRZ2'));
+        $tfa->setRawAttributes($attributes);
+
+        $this->assertEquals('CCSWDTKINR7YM3TR5LQ6EEVIYY5PZRZ2', $tfa->shared_secret);
+    }
+
+    public function test_does_not_decrypt_shared_secret_if_disabled()
+    {
+        $tfa = new TwoFactorAuthentication();
+
+        $tfa->encrypted = false;
+
+        $attributes = $tfa->getAttributes();
+        $attributes['shared_secret'] = Base32::decodeUpper('CCSWDTKINR7YM3TR5LQ6EEVIYY5PZRZ2');
+        $tfa->setRawAttributes($attributes);
+
+        $this->assertEquals('CCSWDTKINR7YM3TR5LQ6EEVIYY5PZRZ2', $tfa->shared_secret);
+    }
+
+    public function test_encrypts_recovery_codes_if_enabled()
+    {
+        $tfa = new TwoFactorAuthentication();
+
+        $tfa->encrypted = true;
+
+        $recoveryCodes = TwoFactorAuthentication::generateRecoveryCodes(1, 7);
+
+        $tfa->recovery_codes = $recoveryCodes;
+
+        $attributes = $tfa->getAttributes();
+
+        $this->assertNotEquals($recoveryCodes->first()['code'], $attributes['recovery_codes']->first()['code']);
+    }
+
+    public function test_does_not_encrypt_recovery_codes_if_disabled()
+    {
+        $tfa = new TwoFactorAuthentication();
+
+        $tfa->encrypted = false;
+
+        $recoveryCodes = TwoFactorAuthentication::generateRecoveryCodes(1, 7);
+
+        $tfa->recovery_codes = $recoveryCodes;
+
+        $attributes = $tfa->getAttributes();
+
+        $this->assertEquals($recoveryCodes->first()['code'], $attributes['recovery_codes']->first()['code']);
+    }
+
+    public function test_decrypts_recovery_codes_if_enabled()
+    {
+        $tfa = new TwoFactorAuthentication();
+
+        $tfa->encrypted = true;
+
+        $recoveryCodes = TwoFactorAuthentication::generateRecoveryCodes(1, 7);
+
+        $attributes = $tfa->getAttributes();
+        $attributes['recovery_codes'] = TwoFactorAuthentication::encryptRecoveryCodes($recoveryCodes);
+
+        $tfa->setRawAttributes($attributes);
+
+        $this->assertEquals($recoveryCodes->first()['code'], $tfa->recovery_codes->first()['code']);
+    }
+
+    public function test_does_not_decrypt_recovery_codes_if_disabled()
+    {
+        $tfa = new TwoFactorAuthentication();
+
+        $tfa->encrypted = false;
+
+        $recoveryCodes = TwoFactorAuthentication::generateRecoveryCodes(1, 7);
+
+        $attributes = $tfa->getAttributes();
+        $attributes['recovery_codes'] = $recoveryCodes;
+
+        $tfa->setRawAttributes($attributes);
+
+        $this->assertEquals($recoveryCodes->first()['code'], $tfa->recovery_codes->first()['code']);
     }
 
     public function test_lowercases_algorithm()
