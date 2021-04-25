@@ -62,6 +62,23 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
     ];
 
     /**
+     * Create a new Eloquent model instance.
+     *
+     * @param  array  $attributes
+     * @return void
+     */
+    public function __construct(array $attributes = [])
+    {
+        if (config('laraguard.encrypted')) {
+            $this->mergeCasts([
+                'shared_secret' => 'encrypted',
+            ]);
+        }
+
+        parent::__construct($attributes);
+    }
+
+    /**
      * The model that uses Two Factor Authentication.
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphTo
@@ -80,6 +97,42 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
     protected function setAlgorithmAttribute($value)
     {
         $this->attributes['algorithm'] = strtolower($value);
+    }
+
+    /**
+     * Gets the Recovery Codes attribute, optionally from its encrypted form.
+     *
+     * @param  mixed  $value
+     * @return \Illuminate\Support\Collection|null
+     */
+    protected function getRecoveryCodesAttribute($value)
+    {
+        $value = $this->castAttribute('recovery_codes', $value);
+
+        if (config('laraguard.encrypted')) {
+            $value = static::decryptRecoveryCodes($value);
+        }
+
+        return $value;
+    }
+
+    /**
+     * Sets the Recovery Codes attribute, optionally to its encrypted form.
+     *
+     * @param  mixed  $value
+     * @return $this
+     */
+    protected function setRecoveryCodesAttribute($value)
+    {
+        if (config('laraguard.encrypted')) {
+            $value = static::encryptRecoveryCodes($value);
+        }
+
+        $value = $this->castAttributeAsJson('recovery_codes', $value);
+
+        $this->attributes['recovery_codes'] = $value;
+
+        return $this;
     }
 
     /**
@@ -116,7 +169,7 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
 
         $this->attributes = array_merge($this->attributes, config('laraguard.totp'));
 
-        $this->attributes['shared_secret'] = static::generateRandomSecret();
+        $this->setAttribute('shared_secret', static::generateRandomSecret());
 
         return $this;
     }

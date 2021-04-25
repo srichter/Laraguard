@@ -123,6 +123,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Encryption
+    |--------------------------------------------------------------------------
+    |
+    | Control whether the shared secret and recovery codes are encrypted when
+    | stored in the database.
+    | Note: If this is set to true, the secret_length cannot be larger than 25.
+    |
+    */
+
+    'encrypted' => false,
+
+    /*
+    |--------------------------------------------------------------------------
     | TOTP config
     |--------------------------------------------------------------------------
     |

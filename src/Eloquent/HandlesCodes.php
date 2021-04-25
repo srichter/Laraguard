@@ -142,7 +142,7 @@ trait HandlesCodes
      */
     protected function getBinarySecret()
     {
-        return Base32::decodeUpper($this->attributes['shared_secret']);
+        return Base32::decodeUpper($this->shared_secret);
     }
 
     /**
