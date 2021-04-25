@@ -4,6 +4,7 @@ namespace DarkGhostHunter\Laraguard\Eloquent;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use ParagonIE\ConstantTime\Base32;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Database\Eloquent\Model;
 use DarkGhostHunter\Laraguard\Contracts\TwoFactorTotp;
 
@@ -20,6 +21,7 @@ use DarkGhostHunter\Laraguard\Contracts\TwoFactorTotp;
  * @property int $seconds
  * @property int $window
  * @property string $algorithm
+ * @property bool $encrypted
  * @property array $totp_config
  * @property null|\Illuminate\Support\Collection $recovery_codes
  * @property null|\Illuminate\Support\Collection $safe_devices
@@ -47,6 +49,7 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
         'digits'             => 'int',
         'seconds'            => 'int',
         'window'             => 'int',
+        'encrypted'          => 'bool',
         'recovery_codes'     => 'collection',
         'safe_devices'       => 'collection',
     ];
@@ -71,6 +74,41 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
         return $this->morphTo('authenticatable');
     }
 
+    /**
+     * Gets the Shared Secret attribute from its binary form.
+     *
+     * @param $value
+     * @return null|string
+     */
+    protected function getSharedSecretAttribute($value)
+    {
+        if ($value === null) {
+            return $value;
+        }
+
+        if ($this->encrypted) {
+            $value = Crypt::decryptString($value);
+        }
+
+        return $value;
+    }
+
+    /**
+     * Sets the Shared Secret attribute to its binary form.
+     *
+     * @param $value
+     * @return $this
+     */
+    protected function setSharedSecretAttribute($value)
+    {
+        if ($this->encrypted) {
+            $value = Crypt::encryptString($value);
+        }
+
+        $this->attributes['shared_secret'] = $value;
+
+        return $this;
+    }
 
     /**
      * Sets the Algorithm to lowercase.
@@ -80,6 +118,42 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
     protected function setAlgorithmAttribute($value)
     {
         $this->attributes['algorithm'] = strtolower($value);
+    }
+
+    /**
+     * Gets the Recovery Codes attribute, optionally from its encrypted form.
+     *
+     * @param $value
+     * @return null|\Illuminate\Support\Collection
+     */
+    protected function getRecoveryCodesAttribute($value)
+    {
+        $value = $this->castAttribute('recovery_codes', $value);
+
+        if ($this->encrypted) {
+            $value = static::decryptRecoveryCodes($value);
+        }
+
+        return $value;
+    }
+
+    /**
+     * Sets the Recovery Codes attribute, optionally to its encrypted form.
+     *
+     * @param $value
+     * @return $this
+     */
+    protected function setRecoveryCodesAttribute($value)
+    {
+        if ($this->encrypted) {
+            $value = static::encryptRecoveryCodes($value);
+        }
+
+        $value = $this->castAttributeAsJson('recovery_codes', $value);
+
+        $this->attributes['recovery_codes'] = $value;
+
+        return $this;
     }
 
     /**
@@ -116,7 +190,7 @@ class TwoFactorAuthentication extends Model implements TwoFactorTotp
 
         $this->attributes = array_merge($this->attributes, config('laraguard.totp'));
 
-        $this->attributes['shared_secret'] = static::generateRandomSecret();
+        $this->setSharedSecretAttribute(static::generateRandomSecret());
 
         return $this;
     }

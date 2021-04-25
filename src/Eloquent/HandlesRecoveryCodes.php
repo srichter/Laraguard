@@ -4,6 +4,7 @@ namespace DarkGhostHunter\Laraguard\Eloquent;
 
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Crypt;
 
 trait HandlesRecoveryCodes
 {
@@ -66,6 +67,38 @@ trait HandlesRecoveryCodes
             return [
                 'code'    => strtoupper(Str::random($length)),
                 'used_at' => null,
+            ];
+        });
+    }
+
+    /**
+     * Decrypts the Recovery Codes attribute.
+     *
+     * @param $value
+     * @return null|\Illuminate\Support\Collection
+     */
+    public static function decryptRecoveryCodes($value)
+    {
+        return optional($value)->map(function ($item) {
+            return [
+                'code' => Crypt::decryptString($item['code']),
+                'used_at' => $item['used_at'],
+            ];
+        });
+    }
+
+    /**
+     * Encrypts the Recovery Codes attribute.
+     *
+     * @param $value
+     * @return null|\Illuminate\Support\Collection
+     */
+    public static function encryptRecoveryCodes($value)
+    {
+        return optional($value)->map(function ($item) {
+            return [
+                'code' => Crypt::encryptString($item['code']),
+                'used_at' => $item['used_at'],
             ];
         });
     }
